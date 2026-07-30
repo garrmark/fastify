@@ -1,3 +1,4 @@
+# codelogic-build-feedback
 name: ci
 
 on:
@@ -6,6 +7,7 @@ on:
      - main
      - next
      - '*.x'
+     - 'codelogic/**'
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -83,8 +85,26 @@ jobs:
           npm install --ignore-scripts
 
       - name: Run tests
+        shell: bash
+        env:
+          NO_COLOR: '1'
+          TERM: dumb
         run: |
-          npm run unit
+          set -o pipefail
+          npm run unit 2>&1 | tee "${{ github.workspace }}/build.log"
+
+      - name: Send CodeLogic Build Info
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        uses: CodeLogicIncEngineering/codelogic-send-build-info-github-action@v1.0.2
+        with:
+          codelogic_host: ${{ vars.CODELOGIC_HOST }}
+          agent_uuid: ${{ vars.AGENT_UUID }}
+          agent_password: ${{ secrets.AGENT_PASSWORD }}
+          job_name: ${{ github.workflow }}
+          build_number: ${{ github.run_number }}
+          build_status: ${{ job.status }}
+          pipeline_system: GitHub Actions
+          log_file: /github/workspace/build.log
 
   # Useful for testing Release Candidates of Node.js
   test-unit-custom:
